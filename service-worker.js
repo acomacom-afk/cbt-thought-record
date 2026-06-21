@@ -1,4 +1,4 @@
-const CACHE_NAME = "cbt-thought-record-v1";
+const CACHE_NAME = "cbt-thought-record-v2";
 
 const ASSETS = [
   "./",
@@ -32,20 +32,21 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// Network-first: while online, always serve the freshest file and refresh the
+// cache as a side effect. Only fall back to the cached copy when the network
+// request fails (e.g. offline). This avoids ever getting stuck on a stale
+// cached version while the app is actively being updated.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
