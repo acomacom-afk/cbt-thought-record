@@ -73,6 +73,8 @@ const ChevronLeft = (p) => <IconBase {...p}><polyline points="15 18 9 12 15 6" /
 const Trash2 = (p) => <IconBase {...p}><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></IconBase>;
 const Pencil = (p) => <IconBase {...p}><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></IconBase>;
 const Check = (p) => <IconBase {...p}><polyline points="20 6 9 17 4 12" /></IconBase>;
+const DownloadIcon = (p) => <IconBase {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></IconBase>;
+const UploadIcon = (p) => <IconBase {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></IconBase>;
 
 /* ---------- helpers ---------- */
 let idSeq = 0;
@@ -212,7 +214,7 @@ function MiniGauge({ value }) {
 }
 
 /* ---------- views ---------- */
-function ListView({ entries, onNew, onSelect }) {
+function ListView({ entries, onNew, onSelect, onExport, onImport, importMessage }) {
   const sorted = entries.slice().sort((a, b) => {
     const diff = new Date(b.date) - new Date(a.date);
     return diff !== 0 ? diff : b.id.localeCompare(a.id);
@@ -223,7 +225,26 @@ function ListView({ entries, onNew, onSelect }) {
         <div className="text-xs font-semibold tracking-wide" style={{ color: C.cool }}>THOUGHT RECORD</div>
         <h1 className="serif text-2xl mt-1" style={{ color: C.ink }}>思考記録</h1>
         <p className="text-xs mt-1" style={{ color: C.inkFaint }}>状況・自動思考・気分・身体反応・行動を書き留める</p>
+        <div className="flex items-center gap-4 mt-3">
+          <button onClick={onExport} className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: C.cool }}>
+            <DownloadIcon size={14} /> バックアップを書き出す
+          </button>
+          <label className="inline-flex items-center gap-1 text-xs font-medium cursor-pointer" style={{ color: C.cool }}>
+            <UploadIcon size={14} /> 読み込む
+            <input
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) onImport(e.target.files[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        {importMessage ? <div className="text-xs mt-2" style={{ color: C.inkSoft }}>{importMessage}</div> : null}
       </div>
+
 
       <div className="flex-1 px-5 pb-28">
         {sorted.length === 0 ? (
@@ -301,7 +322,7 @@ function FormView({ formData, onField, onAddRow, onUpdateRow, onRemoveRow, onSub
           <button onClick={() => onAddRow("emotions")} className="text-xs font-medium mt-1" style={{ color: C.cool }}>+ 感情を追加</button>
         </Field>
 
-        <Field label="身体反応" hint="体に出た感覚">
+        <Field label="身体反応" hint="体に出た感覚と強さ(0-100)">
           {formData.physicalReactions.map((row) => (
             <NameRow key={row.id} row={row} namePlaceholder="例: 動悸、肩のこわばり" removable={formData.physicalReactions.length > 1}
               onName={(v) => onUpdateRow("physicalReactions", row.id, "name", v)}
@@ -426,6 +447,7 @@ function App() {
   const [formData, setFormData] = useState(emptyFormData());
   const [formError, setFormError] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -518,6 +540,42 @@ function App() {
     setView("list");
   }
 
+  function exportData() {
+    try {
+      const blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `thought-record-backup-${toDateInputValue()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setImportMessage("バックアップファイルを書き出しました");
+    } catch (e) {
+      setImportMessage("書き出しに失敗しました");
+    }
+    setTimeout(() => setImportMessage(""), 4000);
+  }
+
+  function importData(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        if (!Array.isArray(parsed)) throw new Error("invalid");
+        const existingIds = new Set(entries.map((en) => en.id));
+        const toAdd = parsed.filter((en) => en && en.id && !existingIds.has(en.id));
+        persist([...entries, ...toAdd]);
+        setImportMessage(`${toAdd.length}件の記録を読み込みました`);
+      } catch (err) {
+        setImportMessage("ファイルの読み込みに失敗しました(形式が正しくない可能性があります)");
+      }
+      setTimeout(() => setImportMessage(""), 4000);
+    };
+    reader.readAsText(file);
+  }
+
   const selectedEntry = entries.find((e) => e.id === selectedId);
 
   return (
@@ -527,7 +585,7 @@ function App() {
         {loading ? (
           <div className="min-h-screen flex items-center justify-center"><span className="text-sm" style={{ color: C.inkFaint }}>読み込み中…</span></div>
         ) : view === "list" ? (
-          <ListView entries={entries} onNew={openNew} onSelect={selectEntry} />
+          <ListView entries={entries} onNew={openNew} onSelect={selectEntry} onExport={exportData} onImport={importData} importMessage={importMessage} />
         ) : view === "form" ? (
           <FormView formData={formData} onField={fieldUpdate} onAddRow={addRow} onUpdateRow={updateRow} onRemoveRow={removeRow} onSubmit={submitForm} onCancel={() => setView(editingId ? "detail" : "list")} isEditing={!!editingId} error={formError} />
         ) : view === "detail" && selectedEntry ? (
