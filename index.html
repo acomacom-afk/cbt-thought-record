@@ -301,7 +301,7 @@ function FormView({ formData, onField, onAddRow, onUpdateRow, onRemoveRow, onSub
           <button onClick={() => onAddRow("emotions")} className="text-xs font-medium mt-1" style={{ color: C.cool }}>+ 感情を追加</button>
         </Field>
 
-        <Field label="身体反応" hint="体に出た感覚と強さ(0-100)">
+        <Field label="身体反応" hint="体に出た感覚">
           {formData.physicalReactions.map((row) => (
             <NameRow key={row.id} row={row} namePlaceholder="例: 動悸、肩のこわばり" removable={formData.physicalReactions.length > 1}
               onName={(v) => onUpdateRow("physicalReactions", row.id, "name", v)}
