@@ -95,27 +95,26 @@ function gaugeColor(value) {
   return `rgb(${r},${g},${bl})`;
 }
 
-function toLocalInputValue(d = new Date()) {
+function toDateInputValue(d = new Date()) {
   const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function formatDateDisplay(value) {
   if (!value) return "";
-  const d = new Date(value);
+  const d = new Date(value.length > 10 ? value : value + "T00:00:00");
   if (isNaN(d.getTime())) return value;
   const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getMonth() + 1}月${d.getDate()}日(${weekdays[d.getDay()]}) ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getMonth() + 1}月${d.getDate()}日(${weekdays[d.getDay()]})`;
 }
 
 function emptyFormData() {
   return {
-    date: toLocalInputValue(),
+    date: toDateInputValue(),
     situation: "",
     automaticThought: "",
     emotions: [{ id: genId(), name: "", value: 50 }],
-    physicalReactions: [{ id: genId(), name: "", value: 50 }],
+    physicalReactions: [{ id: genId(), name: "" }],
     behavior: "",
     evidenceFor: "",
     evidenceAgainst: "",
@@ -182,6 +181,25 @@ function IntensityRow({ row, onName, onValue, onRemove, namePlaceholder, removab
   );
 }
 
+function NameRow({ row, onName, onRemove, namePlaceholder, removable }) {
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <input
+        value={row.name}
+        onChange={(e) => onName(e.target.value)}
+        placeholder={namePlaceholder}
+        className="flex-1 rounded-xl px-3 py-2.5 text-sm focus:outline-none"
+        style={{ background: C.paper, border: `1px solid ${C.border}`, color: C.ink }}
+      />
+      {removable ? (
+        <button onClick={onRemove} className="p-1 rounded-full opacity-60 hover:opacity-100 flex-shrink-0">
+          <XIcon size={15} color={C.inkSoft} />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 function MiniGauge({ value }) {
   return (
     <div className="flex items-center gap-2">
@@ -195,7 +213,10 @@ function MiniGauge({ value }) {
 
 /* ---------- views ---------- */
 function ListView({ entries, onNew, onSelect }) {
-  const sorted = entries.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sorted = entries.slice().sort((a, b) => {
+    const diff = new Date(b.date) - new Date(a.date);
+    return diff !== 0 ? diff : b.id.localeCompare(a.id);
+  });
   return (
     <div className="flex flex-col min-h-screen">
       <div className="px-5 pt-7 pb-4">
@@ -257,8 +278,8 @@ function FormView({ formData, onField, onAddRow, onUpdateRow, onRemoveRow, onSub
       </div>
 
       <div className="flex-1 px-5 pt-5 pb-28">
-        <Field label="日時">
-          <input type="datetime-local" value={formData.date} onChange={(e) => onField("date", e.target.value)} className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none" style={{ background: C.paper, border: `1px solid ${C.border}`, color: C.ink }} />
+        <Field label="日付">
+          <input type="date" value={formData.date} onChange={(e) => onField("date", e.target.value)} className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none" style={{ background: C.paper, border: `1px solid ${C.border}`, color: C.ink }} />
         </Field>
 
         <Field label="状況" hint="いつ、どこで、何があった?">
@@ -282,9 +303,8 @@ function FormView({ formData, onField, onAddRow, onUpdateRow, onRemoveRow, onSub
 
         <Field label="身体反応" hint="体に出た感覚と強さ(0-100)">
           {formData.physicalReactions.map((row) => (
-            <IntensityRow key={row.id} row={row} namePlaceholder="例: 動悸、肩のこわばり" removable={formData.physicalReactions.length > 1}
+            <NameRow key={row.id} row={row} namePlaceholder="例: 動悸、肩のこわばり" removable={formData.physicalReactions.length > 1}
               onName={(v) => onUpdateRow("physicalReactions", row.id, "name", v)}
-              onValue={(v) => onUpdateRow("physicalReactions", row.id, "value", v)}
               onRemove={() => onRemoveRow("physicalReactions", row.id)} />
           ))}
           <button onClick={() => onAddRow("physicalReactions")} className="text-xs font-medium mt-1" style={{ color: C.cool }}>+ 身体反応を追加</button>
@@ -373,12 +393,11 @@ function DetailView({ entry, onBack, onEdit, onDelete, confirmingDelete, onConfi
         {entry.physicalReactions.some((e) => e.name) ? (
           <div className="mb-5">
             <div className="text-xs font-semibold mb-2" style={{ color: C.cool }}>身体反応</div>
-            {entry.physicalReactions.filter((e) => e.name).map((e) => (
-              <div key={e.id} className="flex items-center gap-2 mb-1.5">
-                <span className="text-sm w-20 flex-shrink-0" style={{ color: C.ink }}>{e.name}</span>
-                <div className="flex-1"><MiniGauge value={e.value} /></div>
-              </div>
-            ))}
+            <div className="flex flex-wrap gap-1.5">
+              {entry.physicalReactions.filter((e) => e.name).map((e) => (
+                <span key={e.id} className="text-sm px-2.5 py-1 rounded-full" style={{ background: C.paper, color: C.ink, border: `1px solid ${C.border}` }}>{e.name}</span>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -440,8 +459,9 @@ function App() {
   function openEdit(entry) {
     setFormData({
       ...entry,
+      date: entry.date ? entry.date.slice(0, 10) : toDateInputValue(),
       emotions: entry.emotions.length ? entry.emotions : [{ id: genId(), name: "", value: 50 }],
-      physicalReactions: entry.physicalReactions.length ? entry.physicalReactions : [{ id: genId(), name: "", value: 50 }],
+      physicalReactions: entry.physicalReactions.length ? entry.physicalReactions : [{ id: genId(), name: "" }],
     });
     setEditingId(entry.id);
     setFormError(false);
@@ -458,7 +478,8 @@ function App() {
     setFormData((p) => ({ ...p, [key]: value }));
   }
   function addRow(listKey) {
-    setFormData((p) => ({ ...p, [listKey]: [...p[listKey], { id: genId(), name: "", value: 50 }] }));
+    const newRow = listKey === "physicalReactions" ? { id: genId(), name: "" } : { id: genId(), name: "", value: 50 };
+    setFormData((p) => ({ ...p, [listKey]: [...p[listKey], newRow] }));
   }
   function updateRow(listKey, id, field, value) {
     setFormData((p) => ({ ...p, [listKey]: p[listKey].map((r) => (r.id === id ? { ...r, [field]: value } : r)) }));
