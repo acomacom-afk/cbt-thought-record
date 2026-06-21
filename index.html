@@ -31,7 +31,7 @@
 <body>
 <div id="root"></div>
 
-<script type="text/babel">
+<script type="text/plain" id="app-source">
 const { useState, useEffect } = React;
 
 /* ---------- storage shim (localStorage, same contract as Claude artifact window.storage) ---------- */
@@ -520,6 +520,18 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+
+<script>
+  (function () {
+    var source = document.getElementById("app-source").textContent;
+    var output = Babel.transform(source, {
+      presets: [["react", { runtime: "classic" }]],
+    }).code;
+    var script = document.createElement("script");
+    script.text = output;
+    document.body.appendChild(script);
+  })();
 </script>
 
 <script>
