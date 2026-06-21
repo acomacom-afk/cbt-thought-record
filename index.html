@@ -172,6 +172,7 @@ function IntensityRow({ row, onName, onValue, onRemove, namePlaceholder, removab
           type="range"
           min={0}
           max={100}
+          step={5}
           value={row.value}
           onChange={(e) => onValue(Number(e.target.value))}
           className="intensity-range flex-1"
